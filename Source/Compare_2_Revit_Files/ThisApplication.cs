@@ -49,6 +49,14 @@ namespace Compare_2_Revit_Files
 			TaskDialog.Show("Compare 2 projects macro", string.Format(m, p) );
 		}
 		
+		// Helper function showing messages limited times
+		private static int messCount = 3; // Limit
+		public void ShowMessageN(string m, params Object[] p){
+			if ( messCount < 1 ) return;
+			messCount--;
+			ShowMessage(m,p);
+		}
+		
 		#region Revit Macros generated code
 		private void InternalStartup()
 		{
@@ -62,7 +70,6 @@ namespace Compare_2_Revit_Files
 			string v = "";
 			switch (p.StorageType){
 				case StorageType.Double: v = p.AsDouble().ToString(); break;
-//				case StorageType.ElementId: v = p.AsElementId().ToString(); break;
 				case StorageType.Integer: v = p.AsInteger().ToString(); break;
 				case StorageType.String: v = p.AsString(); break;
 				default: v = p.StorageType.ToString(); break;
@@ -94,11 +101,51 @@ namespace Compare_2_Revit_Files
 			return collector.OfClass(t).ToList();
 		}
 		
+		// Compare 2 parameters
+		public Double tolerance = 0.001;
+		
+		public CpomtareResult CompareParams(Parameter p1, Parameter p2, CpomtareResult rz){
+			if (p1.StorageType != p2.StorageType ){
+				throw(new Exception("Different parameter storage types can't be compared"));
+			}
+			Double d = 0;
+			switch (p1.StorageType){
+					case StorageType.Double: 
+						if (p1.AsDouble()==0) {
+							if (p2.AsDouble()<tolerance) d = 1
+							else d = 0;
+						}
+					else{
+						d = Math.Abs( (p2.AsDouble()-p1.AsDouble()) / p1.AsDouble() );
+						if (d<tolerance) d = 1;
+						else d = 1 - d;
+					}
+			}
+
+			return rz;
+		}
+		// Compare 2 elements upon a list of parameter names
+		public CpomtareResult CompareElements(Element e1, Element e2, params string[] pn){
+			CpomtareResult rz = new CpomtareResult();
+			Dictionary<string,Parameter> dp1 = ParametersOf(e1);
+			Dictionary<string,Parameter> dp2 = ParametersOf(e2);
+			foreach(string n in pn){
+				rz = CompareParams(dp1[n],dp2[n],rz);
+			}
+			return rz;
+		}
+		
 		// Compares elements of type t from documents d1 and d2 upon a list of parameter names
 		public CpomtareResult CompareElementsOtType(Document d1, Document d2, Type t, CpomtareResult rz, params string[] pn){
 			List<Element> le1 = ElementsOfType(d1,t);
-			Dictionary<string,Parameter> pd1 = ParametersOf(le1[0]);
-			rz.message += ParamsToString(le1[0]);
+			List<Element> le2 = ElementsOfType(d2,t);
+			int k = 0;
+			for(int i=0; i<le1.Count; i++){
+				CpomtareResult r0 = CompareElements(le1[i],le2[k],pn);
+				for(int j=k; j<le2.Count; j++){
+					ShowMessageN(i.ToString() + " - " + j.ToString());
+				}
+			}
 			return rz;
 		}
 		
@@ -112,7 +159,7 @@ namespace Compare_2_Revit_Files
 			}
 			
 			// Full path to the base project we compare
-			string baseProjectPathName = @"C:\Users\vanyog\Documents\Project1.rvt";
+			string baseProjectPathName = @"C:\Users\Vanyog\Documents\Project1.rvt";
 			
 			// Getting the tow files we compare
 			Document baseProject = null;

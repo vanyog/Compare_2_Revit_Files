@@ -1,0 +1,148 @@
+/*
+ * Created by SharpDevelop.
+ * User: vanyog
+ * Date: 2/27/2015
+ * Time: 12:00 AM
+ * 
+ * To change this template use Tools | Options | Coding | Edit Standard Headers.
+ */
+using System;
+using System.Text;
+using Autodesk.Revit.UI;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI.Selection;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace CSModule1
+{
+    public class Compare2ElementsResult 
+    {
+        public int total = 0;
+        public string note = "";
+    }
+    
+    [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
+    [Autodesk.Revit.DB.Macros.AddInId("7F1DDF53-CF3E-4C74-BACF-DCDC437D8638")]
+    public partial class ThisApplication
+    {
+        private void Module_Startup(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Module_Shutdown(object sender, EventArgs e)
+        {
+
+        }
+        
+        public void ShowMessage(string s, params string[] p)
+        {
+            TaskDialog.Show("Compare 2 projects macro", string.Format(s, p));
+        }
+        
+        public List<Element> ElementsOfTyle(Document d, Type t){
+            FilteredElementCollector collector = new FilteredElementCollector(d);
+            return collector.OfClass(t).ToList();
+        }
+
+        public List<Element> AllWals(Document d){
+            return ElementsOfTyle(d,typeof(Wall));
+        }
+        
+        public string ParamsToString(Element e){
+            ParameterSet ps = e.Parameters;
+            StringBuilder st = new StringBuilder();
+            foreach(Parameter p in ps){
+                st.AppendLine(p.Definition.Name + " = " + ParamToString(p));
+            }
+            return st.ToString();
+        }
+        
+        public string ParamToString(Parameter p){
+            string v = "";
+            switch (p.StorageType){
+                    case StorageType.Double: v = p.AsDouble().ToString(); break;
+                    case StorageType.String: v = "\"" + p.AsString() + "\""; break;
+                    default: v = "..."+p.StorageType.ToString()+"..."; break;
+            }
+            return v;
+            
+        }
+        
+        public string CompareAllWalls(List<Element> le1, List<Element> le2){
+            StringBuilder sb = new StringBuilder();
+            int k = 0;
+            for(int i=0; i<le1.Count; i++){
+                for(int j=k; j<le2.Count; j++){
+                    sb.AppendLine("Walls " + i.ToString() + "," + j.ToString() + " - " + Compare2Walls(le1[i],le2[j]));
+                }
+            }
+            return sb.ToString();
+        }
+        
+        public IDictionary<string,Parameter> ParDic(ParameterSet ps){
+            IDictionary<string,Parameter> r = new Dictionary<string,Parameter>();
+            foreach(Parameter p in ps){
+                r[p.Definition.Name] = p;
+            }
+            return r;
+        }
+            
+        public string Compare2Walls(Element e1, Element e2){
+            IDictionary<string,Parameter> p1 = ParDic(e1.Parameters);
+            IDictionary<string,Parameter> p2 = ParDic(e2.Parameters);
+//            return p1["Length"].AsDouble().ToString() + "\n\r" + p2["Length"].AsDouble().ToString();
+            return ParamsToString(e1);
+        }
+        
+        public Compare2ElementsResult Compare2ElementsByParams(Element e1, Element e2, params string[] pn){
+            IDictionary<string,Parameter> pd1 = ParDic(e1.Parameters);
+            IDictionary<string,Parameter> pd2 = ParDic(e2.Parameters);
+            StringBuilder sb = new StringBuilder();
+            Compare2ElementsResult r = new Compare2ElementsResult();
+            foreach(string n in pn){
+                Parameter p1 = pd1[n];
+                Parameter p2 = pd2[n];
+                bool y = ParamToString(p1) == ParamToString(p2);
+                if (y) r.total++;
+                sb.AppendLine(n + "=" + y.ToString());
+            }
+            sb.AppendLine(r.total.ToString());
+            r.note = sb.ToString();
+            return r;
+        }
+        
+        #region Revit Macros generated code
+        private void InternalStartup()
+        {
+            this.Startup += new System.EventHandler(Module_Startup);
+            this.Shutdown += new System.EventHandler(Module_Shutdown);
+        }
+        #endregion
+        
+        public void Compare2projectsMacro()
+        {
+            int DocCount = Application.Documents.Size;
+            
+            if (DocCount!=2)
+            {
+                ShowMessage("You must have 2 projects opened to run this macro but there is/are {0} project/s opened.",DocCount.ToString());
+                return;
+            }
+            
+            Document p1 = null, p2 = null;
+            int i = 0;
+            foreach( Autodesk.Revit.DB.Document d in Application.Documents){
+                if (i==0){ p1 = d; i++; }
+                else p2 = d;
+            }
+            
+            List<Element> le1 = ElementsOfTyle(p1, typeof(Level));
+            
+            ShowMessage(Compare2ElementsByParams(le1[0],le1[1],"Name","Elevation").note);
+            
+        }
+        
+    }
+}
