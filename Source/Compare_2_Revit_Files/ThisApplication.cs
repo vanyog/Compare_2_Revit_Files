@@ -21,12 +21,20 @@ namespace Compare_2_Revit_Files
 	{
 		public double result = 0;
 		public double total = 0;
-		public string message = "";
+		private StringBuilder sb = new StringBuilder();
+		
+		public string message{
+			get { return sb.ToString(); }
+		}
+		
+		public void AppendLine(string s){
+			sb.AppendLine(s);
+		}
 		
 		public void Compare(string s, Object o1, Object o2){
 			if (o1.Equals(o2)) result += 1;
 			total += 1;
-			message += s + ": " + result.ToString() + "/" + total.ToString() + "\r\n";
+			sb.AppendLine( s + ": " + result.ToString() + "/" + total.ToString() );
 		}
 	}
 	
@@ -104,7 +112,7 @@ namespace Compare_2_Revit_Files
 		// Compare 2 parameters
 		public Double tolerance = 0.001;
 		
-		public CpomtareResult CompareParams(Parameter p1, Parameter p2, CpomtareResult rz){
+		public CpomtareResult Compare2Params(string n, Parameter p1, Parameter p2, CpomtareResult rz){
 			if (p1.StorageType != p2.StorageType ){
 				throw(new Exception("Different parameter storage types can't be compared"));
 			}
@@ -112,25 +120,33 @@ namespace Compare_2_Revit_Files
 			switch (p1.StorageType){
 					case StorageType.Double: 
 						if (p1.AsDouble()==0) {
-							if (p2.AsDouble()<tolerance) d = 1
+							if (p2.AsDouble()<tolerance) d = 1;
 							else d = 0;
 						}
-					else{
-						d = Math.Abs( (p2.AsDouble()-p1.AsDouble()) / p1.AsDouble() );
-						if (d<tolerance) d = 1;
-						else d = 1 - d;
-					}
+						else{
+							d = Math.Abs( (p2.AsDouble()-p1.AsDouble()) / p1.AsDouble() );
+							if (d<tolerance) d = 1;
+							else d = 1 - d;
+						}
+						break;
+					default:
+						if (p1.Equals(p2)) d = 1;
+						else d = 0;
+						break;
 			}
-
+			rz.result += d;
+			rz.total += 1;
+			rz.AppendLine( n + ": " + d.ToString() + "/1" );
 			return rz;
 		}
 		// Compare 2 elements upon a list of parameter names
-		public CpomtareResult CompareElements(Element e1, Element e2, params string[] pn){
+		public CpomtareResult Compare2Elements(Element e1, Element e2, params string[] pn){
 			CpomtareResult rz = new CpomtareResult();
 			Dictionary<string,Parameter> dp1 = ParametersOf(e1);
 			Dictionary<string,Parameter> dp2 = ParametersOf(e2);
 			foreach(string n in pn){
-				rz = CompareParams(dp1[n],dp2[n],rz);
+				rz = Compare2Params(n,dp1[n],dp2[n],rz);
+				ShowMessageN(rz.message);
 			}
 			return rz;
 		}
@@ -141,7 +157,7 @@ namespace Compare_2_Revit_Files
 			List<Element> le2 = ElementsOfType(d2,t);
 			int k = 0;
 			for(int i=0; i<le1.Count; i++){
-				CpomtareResult r0 = CompareElements(le1[i],le2[k],pn);
+				CpomtareResult r0 = Compare2Elements(le1[i],le2[k],pn);
 				for(int j=k; j<le2.Count; j++){
 					ShowMessageN(i.ToString() + " - " + j.ToString());
 				}
