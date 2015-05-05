@@ -14,8 +14,8 @@
   <PropertyGroup Condition=" '$(Platform)' == 'AnyCPU' ">
     <PlatformTarget>x64</PlatformTarget>
     <Optimize>True</Optimize>
-    <DebugSymbols>True</DebugSymbols>
-    <DebugType>Full</DebugType>
+    <DebugSymbols>False</DebugSymbols>
+    <DebugType>None</DebugType>
     <DefineConstants>TRACE</DefineConstants>
     <OutputPath>..\..\Addin\</OutputPath>
     <AssemblyName>Compare_2_Revit_Files</AssemblyName>

@@ -35,6 +35,10 @@ namespace Compare_2_Revit_Files
 			sb.Append(s);
 		}
 		
+		public string Message(){
+			return message + "Total: " + result.ToString() + "/" + total.ToString();
+		}
+		
 		public void Compare(string s, Object o1, Object o2){
 			if (o1.Equals(o2)) result += 1;
 			total += 1;
@@ -152,6 +156,7 @@ namespace Compare_2_Revit_Files
 			rz.AppendLine( n + ": " + v + "  " + d.ToString() + "/1" );
 			return rz;
 		}
+
 		// Compare 2 elements upon a list of parameter names
 		public CompareResult Compare2Elements(Element e1, Element e2, params string[] pn){
 			CompareResult rz = new CompareResult();
@@ -167,8 +172,16 @@ namespace Compare_2_Revit_Files
 		public CompareResult CompareElementsOtType(Document d1, Document d2, Type t, CompareResult rz, params string[] pn){
 			List<Element> le1 = ElementsOfType(d1,t);
 			List<Element> le2 = ElementsOfType(d2,t);
+			rz.AppendLine(t.FullName);
 			int k = 0; // Number of identical elements found
 			for(int i=0; i<le1.Count; i++){
+				if (i > le2.Count-1){
+					int rr = le1.Count - le2.Count;
+					int tt = rr*pn.Count();
+					rz.total += tt;
+					rz.AppendLine("Missing elements: 0/" + tt.ToString());
+					break;
+				}
 				int m = k;
 				CompareResult r0 = Compare2Elements(le1[i],le2[m],pn);
 				for(int j=k+1; j<le2.Count; j++){
@@ -186,7 +199,7 @@ namespace Compare_2_Revit_Files
 				if (r0.result == r0.total) k++;
 				rz.result += r0.result;
 				rz.total += r0.total;
-				rz.Append(r0.message);
+				rz.AppendLine(r0.Message());
 			}
 			return rz;
 		}
@@ -226,12 +239,12 @@ namespace Compare_2_Revit_Files
 			);
 			
 			// Compare tow projects by element types and their main properties
-			CompareElementsOtType(baseProject,secondProject,typeof(Level),crz,"Name","Elevation");
+//			CompareElementsOtType(baseProject,secondProject,typeof(Level),crz,"Name","Elevation");
 			
 			// Displaying of the result
-			ShowMessage(crz.message);
+//			ShowMessage(crz.Message());
 			
-			ShowMessage(ParamsToString(FirstElementOfTyle(baseProject,typeof(Level))));
+			ShowMessage(ParamsToString(FirstElementOfTyle(baseProject,typeof(Wall))));
 		}
 	}
 }
