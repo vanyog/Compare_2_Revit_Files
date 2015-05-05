@@ -17,7 +17,7 @@ using System.Linq;
 namespace Compare_2_Revit_Files
 {
 	// Class representing the result of comparison
-	public class CpomtareResult
+	public class CompareResult
 	{
 		public double result = 0;
 		public double total = 0;
@@ -29,6 +29,10 @@ namespace Compare_2_Revit_Files
 		
 		public void AppendLine(string s){
 			sb.AppendLine(s);
+		}
+		
+		public void Append(string s){
+			sb.Append(s);
 		}
 		
 		public void Compare(string s, Object o1, Object o2){
@@ -94,6 +98,18 @@ namespace Compare_2_Revit_Files
 			return sb.ToString();
 		}
 		
+		// List of elements in document d which are of type t
+		public List<Element> ElementsOfType(Document d, Type t){
+			FilteredElementCollector collector = new FilteredElementCollector(d);
+			return collector.OfClass(t).ToList();
+		}
+		
+		// First element in document d which is of type t
+		public Element FirstElementOfTyle(Document d, Type t){
+			List<Element> le = ElementsOfType(d, t);
+			return le[0];
+		}
+		
 		// Dictionary of parameters of an element by names
 		public Dictionary<string,Parameter> ParametersOf(Element e){
 			Dictionary<string,Parameter> d = new Dictionary<string, Parameter>();
@@ -103,22 +119,18 @@ namespace Compare_2_Revit_Files
 			return d;
 		}
 		
-		// List of elements in document d which are of type t
-		public List<Element> ElementsOfType(Document d, Type t){
-			FilteredElementCollector collector = new FilteredElementCollector(d);
-			return collector.OfClass(t).ToList();
-		}
-		
 		// Compare 2 parameters
 		public Double tolerance = 0.001;
 		
-		public CpomtareResult Compare2Params(string n, Parameter p1, Parameter p2, CpomtareResult rz){
+		public CompareResult Compare2Params(string n, Parameter p1, Parameter p2, CompareResult rz){
 			if (p1.StorageType != p2.StorageType ){
 				throw(new Exception("Different parameter storage types can't be compared"));
 			}
 			Double d = 0;
+			string v = "";
 			switch (p1.StorageType){
-					case StorageType.Double: 
+					case StorageType.Double:
+					v = p1.AsDouble().ToString() + "-" + p2.AsDouble().ToString();
 						if (p1.AsDouble()==0) {
 							if (p2.AsDouble()<tolerance) d = 1;
 							else d = 0;
@@ -130,37 +142,51 @@ namespace Compare_2_Revit_Files
 						}
 						break;
 					default:
-						if (p1.Equals(p2)) d = 1;
+						v = p1.AsString() + "-" + p2.AsString();
+						if (p1.AsValueString() == p2.AsValueString()) d = 1;
 						else d = 0;
 						break;
 			}
 			rz.result += d;
 			rz.total += 1;
-			rz.AppendLine( n + ": " + d.ToString() + "/1" );
+			rz.AppendLine( n + ": " + v + "  " + d.ToString() + "/1" );
 			return rz;
 		}
 		// Compare 2 elements upon a list of parameter names
-		public CpomtareResult Compare2Elements(Element e1, Element e2, params string[] pn){
-			CpomtareResult rz = new CpomtareResult();
+		public CompareResult Compare2Elements(Element e1, Element e2, params string[] pn){
+			CompareResult rz = new CompareResult();
 			Dictionary<string,Parameter> dp1 = ParametersOf(e1);
 			Dictionary<string,Parameter> dp2 = ParametersOf(e2);
 			foreach(string n in pn){
 				rz = Compare2Params(n,dp1[n],dp2[n],rz);
-				ShowMessageN(rz.message);
 			}
 			return rz;
 		}
 		
 		// Compares elements of type t from documents d1 and d2 upon a list of parameter names
-		public CpomtareResult CompareElementsOtType(Document d1, Document d2, Type t, CpomtareResult rz, params string[] pn){
+		public CompareResult CompareElementsOtType(Document d1, Document d2, Type t, CompareResult rz, params string[] pn){
 			List<Element> le1 = ElementsOfType(d1,t);
 			List<Element> le2 = ElementsOfType(d2,t);
-			int k = 0;
+			int k = 0; // Number of identical elements found
 			for(int i=0; i<le1.Count; i++){
-				CpomtareResult r0 = Compare2Elements(le1[i],le2[k],pn);
-				for(int j=k; j<le2.Count; j++){
-					ShowMessageN(i.ToString() + " - " + j.ToString());
+				int m = k;
+				CompareResult r0 = Compare2Elements(le1[i],le2[m],pn);
+				for(int j=k+1; j<le2.Count; j++){
+					CompareResult r1 = Compare2Elements(le1[j],le2[m],pn);
+					if (r1.result > r0.result ){
+						m = j;
+						r0 = r1;
+					}
 				}
+				if (m != k){
+					Element e = le2[k];
+					le2[k] = le2[m];
+					le2[m] = e;
+				}
+				if (r0.result == r0.total) k++;
+				rz.result += r0.result;
+				rz.total += r0.total;
+				rz.Append(r0.message);
 			}
 			return rz;
 		}
@@ -181,7 +207,7 @@ namespace Compare_2_Revit_Files
 			Document baseProject = null;
 			Document secondProject = null;
 			foreach(Document d in Application.Documents){
-				if (d.PathName == baseProjectPathName) baseProject = d;
+				if (d.PathName.ToLower() == baseProjectPathName.ToLower()) baseProject = d;
 				else secondProject = d;
 			}
 			
@@ -192,16 +218,20 @@ namespace Compare_2_Revit_Files
 			}
 			
 			// Compare Project units
-			CpomtareResult crz = new CpomtareResult();
+			CompareResult crz = new CompareResult();
 			crz.Compare(
 				"Units",
 				baseProject.GetUnits().GetFormatOptions(UnitType.UT_Length).DisplayUnits,
 				secondProject.GetUnits().GetFormatOptions(UnitType.UT_Length).DisplayUnits
 			);
 			
-			CompareElementsOtType(baseProject,secondProject,typeof(Level),crz);
+			// Compare tow projects by element types and their main properties
+			CompareElementsOtType(baseProject,secondProject,typeof(Level),crz,"Name","Elevation");
 			
+			// Displaying of the result
 			ShowMessage(crz.message);
+			
+			ShowMessage(ParamsToString(FirstElementOfTyle(baseProject,typeof(Level))));
 		}
 	}
 }
