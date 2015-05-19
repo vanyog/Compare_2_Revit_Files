@@ -92,6 +92,7 @@ namespace Compare_2_Revit_Files
 		// A string that contains a list of all parameters and their values of an element
 		public string ParamsToString(Element e){
 			StringBuilder sb = new StringBuilder();
+			sb.AppendLine("Element type: " + e.ToString());
 			foreach(Parameter p in e.Parameters){
 				sb.AppendLine(ParamToString(p));
 			}
